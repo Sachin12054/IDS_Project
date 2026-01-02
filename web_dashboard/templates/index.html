@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDS Dashboard - Intrusion Detection System</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --dark: #1e1e2e;
+            --darker: #13131a;
+            --card: #252536;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--darker);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 260px;
+            background: var(--dark);
+            padding: 20px;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 20px;
+        }
+
+        .logo i {
+            font-size: 32px;
+            color: var(--primary);
+        }
+
+        .logo h1 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .logo span {
+            color: var(--primary);
+        }
+
+        .nav-menu {
+            list-style: none;
+        }
+
+        .nav-item {
+            margin-bottom: 5px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 15px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .nav-link i {
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 260px;
+            padding: 20px 30px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .header h2 {
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .status-badge .dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+        }
+
+        .stat-card.blue::before { background: var(--primary); }
+        .stat-card.red::before { background: var(--danger); }
+        .stat-card.green::before { background: var(--success); }
+        .stat-card.yellow::before { background: var(--warning); }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin-bottom: 15px;
+        }
+
+        .stat-card.blue .stat-icon { background: rgba(99, 102, 241, 0.2); color: var(--primary); }
+        .stat-card.red .stat-icon { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .stat-card.green .stat-icon { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .stat-card.yellow .stat-icon { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        /* Charts Section */
+        .charts-section {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Alerts Table */
+        .alerts-section {
+            margin-bottom: 30px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        tr:hover {
+            background: rgba(255,255,255,0.02);
+        }
+
+        .severity-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .severity-high {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        .severity-medium {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+        }
+
+        .severity-low {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        /* Live Feed */
+        .live-feed {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .feed-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .feed-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-size: 14px;
+        }
+
+        .feed-icon.attack {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        .feed-icon.benign {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .feed-info {
+            flex: 1;
+        }
+
+        .feed-title {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .feed-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .feed-confidence {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* Model Performance */
+        .model-card {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            margin-bottom: 12px;
+        }
+
+        .model-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 20px;
+            background: var(--primary);
+            color: white;
+        }
+
+        .model-info {
+            flex: 1;
+        }
+
+        .model-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .model-accuracy {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .model-score {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--success);
+        }
+
+        /* Upload Section */
+        .upload-zone {
+            border: 2px dashed rgba(255,255,255,0.2);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .upload-zone:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .upload-zone i {
+            font-size: 48px;
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+
+        .upload-zone h3 {
+            margin-bottom: 8px;
+        }
+
+        .upload-zone p {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .charts-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            .live-feed {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .progress-fill.blue { background: var(--primary); }
+        .progress-fill.red { background: var(--danger); }
+        .progress-fill.green { background: var(--success); }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="logo">
+            <i class="fas fa-shield-alt"></i>
+            <h1>IDS<span>Shield</span></h1>
+        </div>
+        <nav>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#" class="nav-link active">
+                        <i class="fas fa-home"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-bell"></i>
+                        <span>Alerts</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Analytics</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#timeseries-section" class="nav-link">
+                        <i class="fas fa-chart-area"></i>
+                        <span>Time Series</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-upload"></i>
+                        <span>Analyze File</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-robot"></i>
+                        <span>Models</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="header">
+            <h2>Security Dashboard</h2>
+            <div class="header-actions">
+                <div class="status-badge">
+                    <span class="dot"></span>
+                    <span>System Active</span>
+                </div>
+                <button class="btn btn-primary" onclick="refreshData()">
+                    <i class="fas fa-sync-alt"></i>
+                    Refresh
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Cards -->
+        <section class="stats-grid">
+            <div class="stat-card blue">
+                <div class="stat-icon"><i class="fas fa-network-wired"></i></div>
+                <div class="stat-value" id="total-flows">-</div>
+                <div class="stat-label">Total Network Flows</div>
+            </div>
+            <div class="stat-card red">
+                <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                <div class="stat-value" id="attacks-detected">-</div>
+                <div class="stat-label">Attacks Detected</div>
+            </div>
+            <div class="stat-card green">
+                <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                <div class="stat-value" id="benign-traffic">-</div>
+                <div class="stat-label">Benign Traffic</div>
+            </div>
+            <div class="stat-card yellow">
+                <div class="stat-icon"><i class="fas fa-percentage"></i></div>
+                <div class="stat-value" id="model-accuracy">-</div>
+                <div class="stat-label">Model Accuracy</div>
+            </div>
+        </section>
+
+        <!-- Charts -->
+        <section class="charts-section">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Traffic Timeline (24h)</h3>
+                </div>
+                <canvas id="trafficChart" height="100"></canvas>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Attack Distribution</h3>
+                </div>
+                <canvas id="attackChart" height="200"></canvas>
+            </div>
+        </section>
+
+        <!-- Live Feed & Models -->
+        <section class="live-feed">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-broadcast-tower"></i> Live Traffic Feed</h3>
+                </div>
+                <div id="live-feed-container">
+                    <!-- Feed items will be inserted here -->
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-brain"></i> Model Performance</h3>
+                </div>
+                <div id="model-performance-container">
+                    <!-- Model cards will be inserted here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Recent Alerts -->
+        <section class="alerts-section card" style="margin-top: 20px;">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-bell"></i> Recent Alerts</h3>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Attack Type</th>
+                            <th>Severity</th>
+                            <th>Port</th>
+                            <th>Protocol</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alerts-table">
+                        <!-- Alerts will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Upload Section -->
+        <section class="card" style="margin-top: 20px;">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-upload"></i> Analyze Network Traffic File</h3>
+            </div>
+            <div class="upload-zone" onclick="document.getElementById('file-input').click()">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <h3>Drop CSV file here or click to upload</h3>
+                <p>Upload network traffic data for real-time analysis</p>
+            </div>
+            <input type="file" id="file-input" accept=".csv" style="display: none;" onchange="uploadFile(this)">
+            <div id="upload-results" style="margin-top: 20px; display: none;">
+                <!-- Upload results will be shown here -->
+            </div>
+        </section>
+
+        <!-- Time Series Analysis Section -->
+        <section id="timeseries-section" class="card" style="margin-top: 20px;">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-chart-area"></i> Time Series Analysis (Syllabus Coverage)</h3>
+                <button class="btn btn-primary" onclick="loadTimeSeriesImages()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+            
+            <!-- Time Series Stats -->
+            <div class="stats-grid" style="margin-bottom: 20px;">
+                <div class="stat-card blue">
+                    <div class="stat-icon"><i class="fas fa-chart-bar"></i></div>
+                    <div class="stat-value" style="font-size: 18px;">STATIONARY</div>
+                    <div class="stat-label">ADF Test (p=0.0001)</div>
+                </div>
+                <div class="stat-card green">
+                    <div class="stat-icon"><i class="fas fa-wave-square"></i></div>
+                    <div class="stat-value" style="font-size: 18px;">SARIMA</div>
+                    <div class="stat-label">Best Model (AIC=6273)</div>
+                </div>
+                <div class="stat-card yellow">
+                    <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                    <div class="stat-value" style="font-size: 18px;">GARCH(1,1)</div>
+                    <div class="stat-label">ARCH Effects Detected</div>
+                </div>
+                <div class="stat-card red">
+                    <div class="stat-icon"><i class="fas fa-random"></i></div>
+                    <div class="stat-value" style="font-size: 18px;">Non-Linear</div>
+                    <div class="stat-label">McLeod-Li Test</div>
+                </div>
+            </div>
+
+            <!-- Tab Buttons -->
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button class="btn btn-primary" onclick="showTab('realtime')" id="btn-realtime">
+                    <i class="fas fa-chart-line"></i> Real-Time Charts
+                </button>
+                <button class="btn" style="background: var(--card);" onclick="showTab('static')" id="btn-static">
+                    <i class="fas fa-image"></i> Static Analysis
+                </button>
+            </div>
+
+            <!-- REAL-TIME CHARTS (Default) -->
+            <div id="realtime-charts" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                <!-- Attack Time Series -->
+                <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h4><i class="fas fa-chart-line" style="color: var(--primary);"></i> Attack Time Series</h4>
+                        <span style="background: var(--success); padding: 4px 10px; border-radius: 12px; font-size: 11px;">LIVE</span>
+                    </div>
+                    <canvas id="attackTimeseriesChart" height="150"></canvas>
+                </div>
+                
+                <!-- ACF Chart -->
+                <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h4><i class="fas fa-chart-bar" style="color: var(--warning);"></i> ACF - Unit 1</h4>
+                        <span style="background: var(--primary); padding: 4px 10px; border-radius: 12px; font-size: 11px;">Autocorrelation</span>
+                    </div>
+                    <canvas id="acfChart" height="150"></canvas>
+                </div>
+                
+                <!-- Rolling Statistics -->
+                <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h4><i class="fas fa-wave-square" style="color: var(--success);"></i> Rolling Statistics - Unit 1</h4>
+                        <span style="background: var(--warning); padding: 4px 10px; border-radius: 12px; font-size: 11px;">Window=5</span>
+                    </div>
+                    <canvas id="rollingChart" height="150"></canvas>
+                </div>
+                
+                <!-- Forecast Chart -->
+                <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h4><i class="fas fa-crystal-ball" style="color: var(--danger);"></i> Forecast - Unit 2</h4>
+                        <span style="background: var(--danger); padding: 4px 10px; border-radius: 12px; font-size: 11px;">Prediction</span>
+                    </div>
+                    <canvas id="forecastChart" height="150"></canvas>
+                </div>
+            </div>
+
+            <!-- STATIC IMAGE Gallery (Hidden by default) -->
+            <div style="display: none; grid-template-columns: repeat(2, 1fr); gap: 20px;" id="timeseries-gallery">
+                <!-- Images will be loaded here -->
+                <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                    <p style="margin-top: 10px;">Loading Time Series Analysis...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- TIME SERIES MODELS COMPARISON SECTION -->
+        <section id="models-section" class="card" style="margin-top: 20px;">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-brain"></i> Time Series Models Comparison</h3>
+                <div style="display: flex; gap: 10px;">
+                    <span style="background: rgba(239,68,68,0.2); color: #ef4444; padding: 4px 12px; border-radius: 12px; font-size: 12px;">LINEAR</span>
+                    <span style="background: rgba(16,185,129,0.2); color: #10b981; padding: 4px 12px; border-radius: 12px; font-size: 12px;">NON-LINEAR</span>
+                    <span style="background: rgba(99,102,241,0.2); color: #6366f1; padding: 4px 12px; border-radius: 12px; font-size: 12px;">DEEP LEARNING</span>
+                </div>
+            </div>
+
+            <!-- Model Cards -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px;">
+                <!-- SARIMA Card -->
+                <div style="background: linear-gradient(135deg, rgba(239,68,68,0.2), rgba(239,68,68,0.05)); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px; padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <span style="background: rgba(239,68,68,0.3); padding: 6px 12px; border-radius: 6px; font-size: 11px; color: #ef4444;">LINEAR</span>
+                        <i class="fas fa-chart-line" style="color: #ef4444; font-size: 24px;"></i>
+                    </div>
+                    <h3 style="font-size: 24px; margin-bottom: 5px;">SARIMA</h3>
+                    <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 15px;">SARIMA(1,1,1)(1,0,1,24)</p>
+                    <div style="display: flex; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 11px; color: var(--text-muted);">RMSE</div>
+                            <div style="font-size: 20px; font-weight: 700; color: #ef4444;" id="sarima-rmse">992.42</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 11px; color: var(--text-muted);">MAE</div>
+                            <div style="font-size: 20px; font-weight: 700;">651.70</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- XGBoost Card -->
+                <div style="background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.05)); border: 1px solid rgba(16,185,129,0.3); border-radius: 12px; padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <span style="background: rgba(16,185,129,0.3); padding: 6px 12px; border-radius: 6px; font-size: 11px; color: #10b981;">NON-LINEAR</span>
+                        <i class="fas fa-tree" style="color: #10b981; font-size: 24px;"></i>
+                    </div>
+                    <h3 style="font-size: 24px; margin-bottom: 5px;">XGBoost</h3>
+                    <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 15px;">100 trees, R²=0.60</p>
+                    <div style="display: flex; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 11px; color: var(--text-muted);">RMSE</div>
+                            <div style="font-size: 20px; font-weight: 700; color: #10b981;" id="xgb-rmse">621.72</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 11px; color: var(--text-muted);">MAE</div>
+                            <div style="font-size: 20px; font-weight: 700;">269.44</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LSTM Card (Best) -->
+                <div style="background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(99,102,241,0.05)); border: 2px solid rgba(99,102,241,0.5); border-radius: 12px; padding: 20px; position: relative;">
+                    <div style="position: absolute; top: -10px; right: 15px; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600;">🏆 BEST</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <span style="background: rgba(99,102,241,0.3); padding: 6px 12px; border-radius: 6px; font-size: 11px; color: #6366f1;">DEEP LEARNING</span>
+                        <i class="fas fa-brain" style="color: #6366f1; font-size: 24px;"></i>
+                    </div>
+                    <h3 style="font-size: 24px; margin-bottom: 5px;">LSTM</h3>
+                    <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 15px;">2-layer, 64 hidden units</p>
+                    <div style="display: flex; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 11px; color: var(--text-muted);">RMSE</div>
+                            <div style="font-size: 20px; font-weight: 700; color: #6366f1;" id="lstm-rmse">590.56</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 11px; color: var(--text-muted);">MAE</div>
+                            <div style="font-size: 20px; font-weight: 700;">255.10</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model Forecast Charts -->
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                <!-- Model Comparison Bar Chart -->
+                <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 20px;">
+                    <h4 style="margin-bottom: 15px;"><i class="fas fa-chart-bar" style="color: var(--primary);"></i> RMSE Comparison</h4>
+                    <canvas id="modelComparisonChart" height="180"></canvas>
+                </div>
+
+                <!-- Feature Importance -->
+                <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 20px;">
+                    <h4 style="margin-bottom: 15px;"><i class="fas fa-list-ol" style="color: var(--success);"></i> XGBoost Feature Importance</h4>
+                    <canvas id="featureImportanceChart" height="180"></canvas>
+                </div>
+
+                <!-- SARIMA Forecast -->
+                <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h4><i class="fas fa-chart-line" style="color: #ef4444;"></i> SARIMA Forecast</h4>
+                        <span style="background: rgba(239,68,68,0.2); color: #ef4444; padding: 4px 10px; border-radius: 12px; font-size: 11px;">LINEAR</span>
+                    </div>
+                    <canvas id="sarimaForecastChart" height="150"></canvas>
+                </div>
+
+                <!-- LSTM Forecast -->
+                <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h4><i class="fas fa-brain" style="color: #6366f1;"></i> LSTM Forecast</h4>
+                        <span style="background: rgba(99,102,241,0.2); color: #6366f1; padding: 4px 10px; border-radius: 12px; font-size: 11px;">🏆 BEST</span>
+                    </div>
+                    <canvas id="lstmForecastChart" height="150"></canvas>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Charts
+        let trafficChart, attackChart;
+        let attackTsChart, acfChart, rollingChart, forecastChart;
+        let modelComparisonChart, featureImportanceChart, sarimaForecastChart, lstmForecastChart;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            initTimeSeriesCharts();
+            initModelCharts();
+            loadStats();
+            loadAlerts();
+            loadLiveFeed();
+            loadModelPerformance();
+            loadTrafficTimeline();
+            loadAttackTypes();
+            loadRealtimeTimeSeriesData();
+            loadModelComparisonData();;
+            loadAttackTypes();
+            loadRealtimeTimeSeriesData();
+
+            // Auto refresh
+            setInterval(loadLiveFeed, 5000);
+            setInterval(loadRealtimeTimeSeriesData, 30000); // Update TS charts every 30s
+        });
+
+        function showTab(tab) {
+            if (tab === 'realtime') {
+                document.getElementById('realtime-charts').style.display = 'grid';
+                document.getElementById('timeseries-gallery').style.display = 'none';
+                document.getElementById('btn-realtime').classList.add('btn-primary');
+                document.getElementById('btn-realtime').style.background = '';
+                document.getElementById('btn-static').classList.remove('btn-primary');
+                document.getElementById('btn-static').style.background = 'var(--card)';
+            } else {
+                document.getElementById('realtime-charts').style.display = 'none';
+                document.getElementById('timeseries-gallery').style.display = 'grid';
+                document.getElementById('btn-static').classList.add('btn-primary');
+                document.getElementById('btn-static').style.background = '';
+                document.getElementById('btn-realtime').classList.remove('btn-primary');
+                document.getElementById('btn-realtime').style.background = 'var(--card)';
+                loadTimeSeriesImages();
+            }
+        }
+
+        function initTimeSeriesCharts() {
+            const chartOptions = {
+                responsive: true,
+                plugins: {
+                    legend: { labels: { color: '#94a3b8' } }
+                },
+                scales: {
+                    x: { ticks: { color: '#94a3b8', maxTicksLimit: 10 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                }
+            };
+
+            // Attack Time Series Chart
+            attackTsChart = new Chart(document.getElementById('attackTimeseriesChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Attack Count',
+                        data: [],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // ACF Chart
+            acfChart = new Chart(document.getElementById('acfChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'ACF',
+                        data: [],
+                        backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                        borderColor: '#6366f1',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    plugins: {
+                        ...chartOptions.plugins,
+                        annotation: {
+                            annotations: {}
+                        }
+                    }
+                }
+            });
+
+            // Rolling Statistics Chart
+            rollingChart = new Chart(document.getElementById('rollingChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Original',
+                        data: [],
+                        borderColor: '#94a3b8',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1,
+                        pointRadius: 0
+                    }, {
+                        label: 'Rolling Mean',
+                        data: [],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                        fill: true,
+                        borderWidth: 2
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // Forecast Chart
+            forecastChart = new Chart(document.getElementById('forecastChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Historical',
+                        data: [],
+                        borderColor: '#6366f1',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2
+                    }, {
+                        label: 'Forecast',
+                        data: [],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                        fill: true,
+                        borderWidth: 2,
+                        borderDash: [5, 5]
+                    }]
+                },
+                options: chartOptions
+            });
+        }
+
+        // Initialize Model Comparison Charts
+        function initModelCharts() {
+            const chartOptions = {
+                responsive: true,
+                plugins: {
+                    legend: { labels: { color: '#94a3b8' } }
+                },
+                scales: {
+                    x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                }
+            };
+
+            // Model Comparison Bar Chart
+            modelComparisonChart = new Chart(document.getElementById('modelComparisonChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['SARIMA\n(Linear)', 'XGBoost\n(Non-Linear)', 'LSTM\n(Deep Learning)'],
+                    datasets: [{
+                        label: 'RMSE',
+                        data: [992.42, 621.72, 590.56],
+                        backgroundColor: ['rgba(239,68,68,0.7)', 'rgba(16,185,129,0.7)', 'rgba(99,102,241,0.7)'],
+                        borderColor: ['#ef4444', '#10b981', '#6366f1'],
+                        borderWidth: 2
+                    }, {
+                        label: 'MAE',
+                        data: [651.70, 269.44, 255.10],
+                        backgroundColor: ['rgba(239,68,68,0.3)', 'rgba(16,185,129,0.3)', 'rgba(99,102,241,0.3)'],
+                        borderColor: ['#ef4444', '#10b981', '#6366f1'],
+                        borderWidth: 1
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // Feature Importance Chart
+            featureImportanceChart = new Chart(document.getElementById('featureImportanceChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['rolling_mean_6', 'lag_1', 'lag_2', 'lag_17', 'rolling_mean_24'],
+                    datasets: [{
+                        label: 'Importance',
+                        data: [0.36, 0.34, 0.08, 0.05, 0.03],
+                        backgroundColor: 'rgba(16,185,129,0.7)',
+                        borderColor: '#10b981',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            // SARIMA Forecast Chart
+            sarimaForecastChart = new Chart(document.getElementById('sarimaForecastChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Actual',
+                        data: [],
+                        borderColor: '#94a3b8',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2
+                    }, {
+                        label: 'SARIMA Forecast',
+                        data: [],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239,68,68,0.2)',
+                        fill: true,
+                        borderWidth: 2,
+                        borderDash: [5, 5]
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // LSTM Forecast Chart
+            lstmForecastChart = new Chart(document.getElementById('lstmForecastChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Actual',
+                        data: [],
+                        borderColor: '#94a3b8',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2
+                    }, {
+                        label: 'LSTM Forecast',
+                        data: [],
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99,102,241,0.2)',
+                        fill: true,
+                        borderWidth: 2,
+                        borderDash: [5, 5]
+                    }]
+                },
+                options: chartOptions
+            });
+        }
+
+        // Load Model Comparison Data
+        async function loadModelComparisonData() {
+            // Load SARIMA Forecast
+            try {
+                const sarimaRes = await fetch('/api/models/sarima_forecast');
+                const sarimaData = await sarimaRes.json();
+                sarimaForecastChart.data.labels = sarimaData.labels.slice(0, 50);
+                sarimaForecastChart.data.datasets[0].data = sarimaData.actual.slice(0, 50);
+                sarimaForecastChart.data.datasets[1].data = sarimaData.forecast.slice(0, 50);
+                sarimaForecastChart.update();
+            } catch (e) { console.error('Error loading SARIMA:', e); }
+
+            // Load LSTM Forecast
+            try {
+                const lstmRes = await fetch('/api/models/lstm_forecast');
+                const lstmData = await lstmRes.json();
+                lstmForecastChart.data.labels = lstmData.labels.slice(0, 50);
+                lstmForecastChart.data.datasets[0].data = lstmData.actual.slice(0, 50);
+                lstmForecastChart.data.datasets[1].data = lstmData.forecast.slice(0, 50);
+                lstmForecastChart.update();
+            } catch (e) { console.error('Error loading LSTM:', e); }
+        }
+
+        async function loadRealtimeTimeSeriesData() {
+            // Load Attack Time Series
+            try {
+                const tsResponse = await fetch('/api/realtime/attack_timeseries');
+                const tsData = await tsResponse.json();
+                attackTsChart.data.labels = tsData.labels;
+                attackTsChart.data.datasets[0].data = tsData.data;
+                attackTsChart.update();
+            } catch (e) { console.error('Error loading attack timeseries:', e); }
+
+            // Load ACF
+            try {
+                const acfResponse = await fetch('/api/realtime/acf_data');
+                const acfData = await acfResponse.json();
+                acfChart.data.labels = acfData.labels;
+                acfChart.data.datasets[0].data = acfData.acf;
+                acfChart.update();
+            } catch (e) { console.error('Error loading ACF:', e); }
+
+            // Load Rolling Stats
+            try {
+                const rollResponse = await fetch('/api/realtime/rolling_stats');
+                const rollData = await rollResponse.json();
+                rollingChart.data.labels = rollData.labels;
+                rollingChart.data.datasets[0].data = rollData.original;
+                rollingChart.data.datasets[1].data = rollData.rolling_mean;
+                rollingChart.update();
+            } catch (e) { console.error('Error loading rolling stats:', e); }
+
+            // Load Forecast
+            try {
+                const foreResponse = await fetch('/api/realtime/forecast');
+                const foreData = await foreResponse.json();
+                const allLabels = [...foreData.historical.labels, ...foreData.forecast.labels];
+                const historicalData = [...foreData.historical.data, ...Array(foreData.forecast.data.length).fill(null)];
+                const forecastData = [...Array(foreData.historical.data.length).fill(null), ...foreData.forecast.data];
+                
+                forecastChart.data.labels = allLabels;
+                forecastChart.data.datasets[0].data = historicalData;
+                forecastChart.data.datasets[1].data = forecastData;
+                forecastChart.update();
+            } catch (e) { console.error('Error loading forecast:', e); }
+        }
+
+        function initCharts() {
+            // Traffic Timeline Chart
+            const trafficCtx = document.getElementById('trafficChart').getContext('2d');
+            trafficChart = new Chart(trafficCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Benign',
+                        data: [],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'Attacks',
+                        data: [],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#94a3b8' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        },
+                        y: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        }
+                    }
+                }
+            });
+
+            // Attack Distribution Chart
+            const attackCtx = document.getElementById('attackChart').getContext('2d');
+            attackChart = new Chart(attackCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: ['#ef4444', '#f59e0b', '#6366f1', '#10b981', '#94a3b8']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                
+                document.getElementById('total-flows').textContent = formatNumber(data.total_flows);
+                document.getElementById('attacks-detected').textContent = formatNumber(data.attacks_detected);
+                document.getElementById('benign-traffic').textContent = formatNumber(data.benign_traffic);
+                document.getElementById('model-accuracy').textContent = data.model_accuracy + '%';
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        async function loadAlerts() {
+            try {
+                const response = await fetch('/api/recent_alerts');
+                const alerts = await response.json();
+                
+                const tbody = document.getElementById('alerts-table');
+                tbody.innerHTML = alerts.map(alert => `
+                    <tr>
+                        <td>${alert.timestamp}</td>
+                        <td>${alert.type}</td>
+                        <td><span class="severity-badge severity-${alert.severity.toLowerCase()}">${alert.severity}</span></td>
+                        <td>${alert.dst_port}</td>
+                        <td>${alert.protocol}</td>
+                        <td><span class="severity-badge severity-high">${alert.status}</span></td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading alerts:', error);
+            }
+        }
+
+        async function loadLiveFeed() {
+            try {
+                const response = await fetch('/api/live_feed');
+                const feed = await response.json();
+                
+                const container = document.getElementById('live-feed-container');
+                container.innerHTML = feed.map(item => `
+                    <div class="feed-item">
+                        <div class="feed-icon ${item.prediction.toLowerCase()}">
+                            <i class="fas fa-${item.prediction === 'ATTACK' ? 'exclamation' : 'check'}"></i>
+                        </div>
+                        <div class="feed-info">
+                            <div class="feed-title">${item.src_ip} → ${item.dst_ip}:${item.dst_port}</div>
+                            <div class="feed-meta">${item.timestamp} | ${item.protocol} | ${item.bytes} bytes</div>
+                        </div>
+                        <div class="feed-confidence" style="color: ${item.prediction === 'ATTACK' ? '#ef4444' : '#10b981'}">
+                            ${item.confidence}%
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading live feed:', error);
+            }
+        }
+
+        async function loadModelPerformance() {
+            try {
+                const response = await fetch('/api/model_performance');
+                const models = await response.json();
+                
+                const container = document.getElementById('model-performance-container');
+                container.innerHTML = models.map(model => `
+                    <div class="model-card">
+                        <div class="model-icon">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                        <div class="model-info">
+                            <div class="model-name">${model.model}</div>
+                            <div class="model-accuracy">F1: ${model.f1_score}% | AUC: ${model.auc}%</div>
+                        </div>
+                        <div class="model-score">${model.accuracy}%</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading model performance:', error);
+            }
+        }
+
+        async function loadTrafficTimeline() {
+            try {
+                const response = await fetch('/api/traffic_timeline');
+                const data = await response.json();
+                
+                trafficChart.data.labels = data.map(d => d.time);
+                trafficChart.data.datasets[0].data = data.map(d => d.benign);
+                trafficChart.data.datasets[1].data = data.map(d => d.attacks);
+                trafficChart.update();
+            } catch (error) {
+                console.error('Error loading traffic timeline:', error);
+            }
+        }
+
+        async function loadAttackTypes() {
+            try {
+                const response = await fetch('/api/attack_types');
+                const data = await response.json();
+                
+                attackChart.data.labels = data.map(d => d.type);
+                attackChart.data.datasets[0].data = data.map(d => d.count);
+                attackChart.update();
+            } catch (error) {
+                console.error('Error loading attack types:', error);
+            }
+        }
+
+        async function uploadFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const resultsDiv = document.getElementById('upload-results');
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = '<p>Analyzing file... <i class="fas fa-spinner fa-spin"></i></p>';
+
+            try {
+                const response = await fetch('/api/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.error) {
+                    resultsDiv.innerHTML = `<p style="color: #ef4444;">Error: ${data.error}</p>`;
+                    return;
+                }
+
+                resultsDiv.innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 15px;">
+                        <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 10px; text-align: center;">
+                            <div style="font-size: 28px; font-weight: bold; color: #6366f1;">${data.total_samples}</div>
+                            <div style="color: #94a3b8;">Total Samples</div>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 10px; text-align: center;">
+                            <div style="font-size: 28px; font-weight: bold; color: #ef4444;">${data.attacks_detected}</div>
+                            <div style="color: #94a3b8;">Attacks Detected</div>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 10px; text-align: center;">
+                            <div style="font-size: 28px; font-weight: bold; color: #10b981;">${data.benign_detected}</div>
+                            <div style="color: #94a3b8;">Benign Traffic</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding: 15px; background: rgba(239, 68, 68, 0.1); border-radius: 10px; border-left: 4px solid #ef4444;">
+                        <strong>Attack Rate: ${data.attack_rate}%</strong><br>
+                        High Risk: ${data.high_risk} | Medium Risk: ${data.medium_risk} | Low Risk: ${data.low_risk}
+                    </div>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `<p style="color: #ef4444;">Error: ${error.message}</p>`;
+            }
+        }
+
+        function refreshData() {
+            loadStats();
+            loadAlerts();
+            loadLiveFeed();
+            loadTrafficTimeline();
+            loadTimeSeriesImages();
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num;
+        }
+
+        // Time Series Analysis Functions
+        async function loadTimeSeriesImages() {
+            try {
+                const response = await fetch('/api/timeseries_images');
+                const images = await response.json();
+                
+                const gallery = document.getElementById('timeseries-gallery');
+                
+                if (images.length === 0) {
+                    gallery.innerHTML = `
+                        <div style="grid-column: span 2; text-align: center; padding: 40px; color: var(--text-muted);">
+                            <i class="fas fa-exclamation-circle fa-2x"></i>
+                            <p style="margin-top: 10px;">No analysis available. Run: python notebooks/time_series_analysis.py</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Define descriptions for each image
+                const descriptions = {
+                    'attack_count_acf_pacf': {
+                        title: 'ACF & PACF Analysis',
+                        unit: 'Unit 1',
+                        desc: 'Autocorrelation and Partial Autocorrelation Functions'
+                    },
+                    'attack_count_decomposition': {
+                        title: 'Seasonal Decomposition',
+                        unit: 'Unit 3',
+                        desc: 'Trend + Seasonal + Residual Components'
+                    },
+                    'attack_count_sarima': {
+                        title: 'SARIMA Forecast',
+                        unit: 'Unit 2',
+                        desc: 'Seasonal ARIMA Model Predictions'
+                    },
+                    'traffic_volume_garch': {
+                        title: 'GARCH Volatility',
+                        unit: 'Unit 2',
+                        desc: 'Conditional Heteroscedasticity Analysis'
+                    },
+                    'attack_forecast_comparison': {
+                        title: 'Forecast Comparison',
+                        unit: 'Unit 4',
+                        desc: 'SMA vs Exponential Smoothing vs ARIMA'
+                    }
+                };
+                
+                gallery.innerHTML = images.map(img => {
+                    const key = img.filename.replace('.png', '');
+                    const info = descriptions[key] || { title: img.name, unit: 'Analysis', desc: '' };
+                    return `
+                        <div style="background: rgba(0,0,0,0.2); border-radius: 12px; overflow: hidden;">
+                            <div style="padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                <span style="background: var(--primary); padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;">${info.unit}</span>
+                                <h4 style="margin-top: 10px; font-size: 16px;">${info.title}</h4>
+                                <p style="font-size: 12px; color: var(--text-muted); margin-top: 5px;">${info.desc}</p>
+                            </div>
+                            <img src="${img.url}" alt="${img.name}" style="width: 100%; height: auto; cursor: pointer;" onclick="openFullscreen('${img.url}', '${info.title}')">
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (error) {
+                console.error('Error loading time series images:', error);
+                document.getElementById('timeseries-gallery').innerHTML = `
+                    <div style="grid-column: span 2; text-align: center; padding: 40px; color: #ef4444;">
+                        <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        <p style="margin-top: 10px;">Error loading analysis: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function openFullscreen(url, title) {
+            // Create modal for fullscreen view
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.95); z-index: 1000;
+                display: flex; flex-direction: column; align-items: center; justify-content: center;
+                cursor: pointer;
+            `;
+            modal.innerHTML = `
+                <h3 style="color: white; margin-bottom: 20px;">${title}</h3>
+                <img src="${url}" style="max-width: 90%; max-height: 80vh; border-radius: 8px;">
+                <p style="color: #94a3b8; margin-top: 15px;">Click anywhere to close</p>
+            `;
+            modal.onclick = () => modal.remove();
+            document.body.appendChild(modal);
+        }
+
+        // Load time series on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTimeSeriesImages();
+        });
+    </script>
+</body>
+</html>

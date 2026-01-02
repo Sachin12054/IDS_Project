@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data files (too large for GitHub)
+data/raw_csv/*.csv
+data/processed/*.parquet
+data/processed/*.npz
+*.parquet
+*.csv
+
+# Model files (large binary files)
+models/*.pkl
+models/*.pth
+models/*.joblib
+models/*.h5
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+*.env
+
+# Keep folder structure
+!data/raw_csv/.gitkeep
+!data/processed/.gitkeep
+!models/.gitkeep
