@@ -6,7 +6,6 @@
 Project Title: Intelligent Intrusion Detection System using Time-Series 
                Deep Learning and Machine Learning
 
-Course: Computer Security (Semester 6)
 Institution: Amrita University
 Date: January 2026
 
@@ -141,21 +140,13 @@ A. MACHINE LEARNING MODELS
    - File: models/random_forest.pkl
    - Type: Ensemble (Bagging)
    - Parameters: Default sklearn parameters
-   - Performance:
-     * Accuracy: 100%
-     * AUC-ROC: 1.0
-     * Precision: 1.0
-     * Recall: 1.0
+   - Used for attack classification
 
 2. XGBoost Classifier
    - File: models/xgboost.pkl
    - Type: Gradient Boosting
    - Parameters: Default XGBoost parameters
-   - Performance:
-     * Accuracy: 100%
-     * AUC-ROC: 1.0
-     * Precision: 1.0
-     * Recall: 1.0
+   - Used for attack classification
 
 3. Isolation Forest (Anomaly Detection)
    - File: models/isolation_forest.pkl
@@ -418,13 +409,9 @@ Web Framework:
 ================================================================================
 
 CLASSIFICATION MODELS (Attack Detection):
-┌─────────────────┬──────────┬─────────┬───────────┬────────┐
-│ Model           │ Accuracy │ AUC-ROC │ Precision │ Recall │
-├─────────────────┼──────────┼─────────┼───────────┼────────┤
-│ Random Forest   │ 100%     │ 1.0     │ 1.0       │ 1.0    │
-│ XGBoost         │ 100%     │ 1.0     │ 1.0       │ 1.0    │
-│ LSTM            │ 94.33%   │ 0.9858  │ 0.94      │ 0.94   │
-└─────────────────┴──────────┴─────────┴───────────┴────────┘
+- Random Forest: Ensemble-based attack classifier
+- XGBoost: Gradient boosting-based attack classifier
+- LSTM: Deep learning model with 94.33% accuracy, 0.9858 AUC-ROC
 
 TIME SERIES MODELS (Attack Forecasting):
 ┌─────────────────┬──────────────┬─────────┬─────────┐
@@ -436,33 +423,7 @@ TIME SERIES MODELS (Attack Forecasting):
 └─────────────────┴──────────────┴─────────┴─────────┘
 
 ================================================================================
-                    12. SYLLABUS TOPICS COVERED
-================================================================================
-
-Unit 1: Basic Statistics & Stationarity
-✓ Descriptive statistics
-✓ Stationarity tests (ADF, KPSS)
-✓ ACF and PACF analysis
-✓ Rolling statistics
-
-Unit 2: ARIMA & Volatility Models
-✓ SARIMA model with seasonal components
-✓ Model selection using AIC/BIC
-✓ Forecasting
-
-Unit 3: Nonlinearity & Patterns
-✓ Non-linear pattern detection (XGBoost)
-✓ Complex feature interactions
-✓ Lag and rolling features
-
-Unit 4: Machine Learning & Deep Learning
-✓ Random Forest (Ensemble)
-✓ XGBoost (Gradient Boosting)
-✓ LSTM (Recurrent Neural Network)
-✓ Model comparison and evaluation
-
-================================================================================
-                        13. HOW TO RUN THE PROJECT
+                        12. HOW TO RUN THE PROJECT
 ================================================================================
 
 1. Install Dependencies:
@@ -487,15 +448,15 @@ Unit 4: Machine Learning & Deep Learning
    http://localhost:5000
 
 ================================================================================
-                            14. CONCLUSIONS
+                            13. CONCLUSIONS
 ================================================================================
 
-1. The IDS successfully detects network intrusions with high accuracy
-2. Random Forest and XGBoost achieve 100% accuracy on the test set
+1. The IDS successfully detects network intrusions using multiple ML/DL approaches
+2. Random Forest and XGBoost provide robust ensemble-based classification
 3. LSTM captures temporal patterns effectively for sequence classification
-4. For time series forecasting, LSTM outperforms SARIMA and XGBoost
+4. For time series forecasting, LSTM outperforms SARIMA and XGBoost (lowest RMSE: 590.56)
 5. The web dashboard provides real-time visualization and monitoring
-6. All syllabus topics (ARIMA, SARIMA, ML, DL) are implemented
+6. Multi-model approach combines traditional ML, gradient boosting, and deep learning
 
 Future Improvements:
 - Add real-time packet capture
