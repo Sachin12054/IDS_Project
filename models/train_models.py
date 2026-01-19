@@ -31,25 +31,40 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 logger.info(f"Using device: {device}")
 
 class LSTMClassifier(nn.Module):
-    """LSTM model for time series classification"""
-    def __init__(self, input_size, hidden_size=128, num_layers=2, dropout=0.2):
+    """LSTM model for time series classification with improved architecture"""
+    def __init__(self, input_size, hidden_size=96, num_layers=2, dropout=0.3):
         super(LSTMClassifier, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         
+        # Bidirectional LSTM for capturing patterns in both directions
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, 
-                           batch_first=True, dropout=dropout, bidirectional=True)
+                           batch_first=True, dropout=dropout if num_layers > 1 else 0, 
+                           bidirectional=True)
+        
+        # Fully connected layers with batch normalization
+        self.batch_norm = nn.BatchNorm1d(hidden_size * 2)
         self.fc1 = nn.Linear(hidden_size * 2, 64)
-        self.dropout = nn.Dropout(dropout)
-        self.fc2 = nn.Linear(64, 1)
+        self.dropout1 = nn.Dropout(dropout)
+        self.fc2 = nn.Linear(64, 32)
+        self.dropout2 = nn.Dropout(dropout * 0.7)  # Slightly less dropout in deeper layer
+        self.fc3 = nn.Linear(32, 1)
         self.sigmoid = nn.Sigmoid()
         
     def forward(self, x):
+        # LSTM layer
         lstm_out, _ = self.lstm(x)
         out = lstm_out[:, -1, :]  # Take last time step
+        
+        # Batch normalization
+        out = self.batch_norm(out)
+        
+        # Fully connected layers with dropout
         out = torch.relu(self.fc1(out))
-        out = self.dropout(out)
-        out = self.sigmoid(self.fc2(out))
+        out = self.dropout1(out)
+        out = torch.relu(self.fc2(out))
+        out = self.dropout2(out)
+        out = self.sigmoid(self.fc3(out))
         return out
 
 class GRUClassifier(nn.Module):
@@ -162,7 +177,7 @@ class TimeSeriesIDSTrainer:
         return X, y, feature_columns
     
     def train_random_forest(self, X_train, X_test, y_train, y_test):
-        """Train Random Forest Classifier"""
+        """Train Random Forest Classifier with anti-overfitting measures"""
         logger.info("Training Random Forest Classifier...")
         
         # Scale features
@@ -171,15 +186,17 @@ class TimeSeriesIDSTrainer:
         X_test_scaled = scaler.transform(X_test)
         self.scalers['rf'] = scaler
         
-        # Train Random Forest
+        # Train Random Forest with reduced complexity to prevent overfitting
         rf = RandomForestClassifier(
-            n_estimators=100,
-            max_depth=20,
-            min_samples_split=5,
-            min_samples_leaf=2,
+            n_estimators=150,         # Increased for better generalization
+            max_depth=10,             # Reduced from 20 to prevent overfitting
+            min_samples_split=20,     # Increased from 5 to require more samples
+            min_samples_leaf=10,      # Increased from 2 to smooth predictions
+            max_features='sqrt',      # Limit features per split
             random_state=42,
             n_jobs=-1,
-            class_weight='balanced'
+            class_weight='balanced',
+            max_samples=0.8           # Bootstrap sample size (bagging)
         )
         
         logger.info("Fitting Random Forest...")
@@ -189,17 +206,25 @@ class TimeSeriesIDSTrainer:
         # Predictions
         y_pred = rf.predict(X_test_scaled)
         y_pred_proba = rf.predict_proba(X_test_scaled)[:, 1]
+        y_train_pred = rf.predict(X_train_scaled)
         
         # Evaluation
-        accuracy = accuracy_score(y_test, y_pred)
+        train_accuracy = accuracy_score(y_train, y_train_pred)
+        test_accuracy = accuracy_score(y_test, y_pred)
         f1 = f1_score(y_test, y_pred)
         auc = roc_auc_score(y_test, y_pred_proba)
         
+        # Cross-validation for better estimate
+        cv_scores = cross_val_score(rf, X_train_scaled, y_train, cv=5, scoring='roc_auc')
+        
         logger.info("=" * 50)
         logger.info("RANDOM FOREST RESULTS:")
-        logger.info(f"Accuracy: {accuracy:.4f}")
+        logger.info(f"Train Accuracy: {train_accuracy:.4f}")
+        logger.info(f"Test Accuracy:  {test_accuracy:.4f}")
+        logger.info(f"Overfitting Gap: {(train_accuracy - test_accuracy):.4f}")
         logger.info(f"F1 Score: {f1:.4f}")
         logger.info(f"ROC AUC Score: {auc:.4f}")
+        logger.info(f"CV AUC (mean±std): {cv_scores.mean():.4f}±{cv_scores.std():.4f}")
         logger.info("=" * 50)
         print("\nClassification Report:")
         print(classification_report(y_test, y_pred))
@@ -219,39 +244,54 @@ class TimeSeriesIDSTrainer:
         # Calculate scale_pos_weight for imbalanced data
         scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
         
-        # Train XGBoost
+        # Train XGBoost with regularization to prevent overfitting
         model = xgb.XGBClassifier(
-            n_estimators=100,
-            max_depth=6,
-            learning_rate=0.1,
-            subsample=0.8,
-            colsample_bytree=0.8,
+            n_estimators=150,           # Increased for better learning
+            max_depth=4,                # Reduced from 6 to prevent overfitting
+            learning_rate=0.05,         # Reduced from 0.1 for slower, better learning
+            subsample=0.7,              # Reduced from 0.8 for more regularization
+            colsample_bytree=0.7,       # Reduced from 0.8 for feature sampling
+            colsample_bylevel=0.7,      # Additional regularization
+            min_child_weight=5,         # Increased to prevent overfitting on small groups
+            gamma=0.1,                  # Minimum loss reduction for split
+            reg_alpha=0.1,              # L1 regularization
+            reg_lambda=1.0,             # L2 regularization
             scale_pos_weight=scale_pos_weight,
             random_state=42,
-            eval_metric='auc'
+            eval_metric='auc',
+            early_stopping_rounds=15
         )
         
         logger.info("Fitting XGBoost...")
         model.fit(X_train_scaled, y_train, 
-                 eval_set=[(X_test_scaled, y_test)],
+                 eval_set=[(X_train_scaled, y_train), (X_test_scaled, y_test)],
                  verbose=False)
         
         self.models['xgboost'] = model
         
         # Predictions
+        y_train_pred = model.predict(X_train_scaled)
         y_pred = model.predict(X_test_scaled)
         y_pred_proba = model.predict_proba(X_test_scaled)[:, 1]
         
         # Evaluation
-        accuracy = accuracy_score(y_test, y_pred)
+        train_accuracy = accuracy_score(y_train, y_train_pred)
+        test_accuracy = accuracy_score(y_test, y_pred)
         f1 = f1_score(y_test, y_pred)
         auc = roc_auc_score(y_test, y_pred_proba)
         
+        # Cross-validation
+        cv_scores = cross_val_score(model, X_train_scaled, y_train, cv=5, scoring='roc_auc')
+        
         logger.info("=" * 50)
         logger.info("XGBOOST RESULTS:")
-        logger.info(f"Accuracy: {accuracy:.4f}")
+        logger.info(f"Train Accuracy: {train_accuracy:.4f}")
+        logger.info(f"Test Accuracy:  {test_accuracy:.4f}")
+        logger.info(f"Overfitting Gap: {(train_accuracy - test_accuracy):.4f}")
         logger.info(f"F1 Score: {f1:.4f}")
         logger.info(f"ROC AUC Score: {auc:.4f}")
+        logger.info(f"CV AUC (mean±std): {cv_scores.mean():.4f}±{cv_scores.std():.4f}")
+        logger.info(f"Best iteration: {model.best_iteration}")
         logger.info("=" * 50)
         print("\nClassification Report:")
         print(classification_report(y_test, y_pred))
@@ -315,18 +355,21 @@ class TimeSeriesIDSTrainer:
         test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
         
-        # Initialize model
+        # Initialize model with improved architecture
         input_size = X_train.shape[2]
-        model = LSTMClassifier(input_size, hidden_size=64, num_layers=1, dropout=0.1).to(device)
+        model = LSTMClassifier(input_size, hidden_size=96, num_layers=2, dropout=0.3).to(device)
         
-        # Loss and optimizer
+        # Loss and optimizer with weight decay for regularization
         criterion = nn.BCELoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, factor=0.5)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, factor=0.5, verbose=True)
         
         # Training loop
         best_auc = 0
+        best_loss = float('inf')
         patience_counter = 0
+        train_losses = []
+        val_losses = []
         
         logger.info("Starting LSTM training...")
         for epoch in range(epochs):
@@ -345,34 +388,42 @@ class TimeSeriesIDSTrainer:
             # Batched validation
             model.eval()
             val_outputs_list = []
+            val_loss = 0
             with torch.no_grad():
                 for batch_X, batch_y in test_loader:
-                    batch_X = batch_X.to(device)
-                    outputs = model(batch_X).cpu().numpy()
-                    val_outputs_list.append(outputs)
+                    batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+                    outputs = model(batch_X)
+                    val_loss += criterion(outputs, batch_y).item()
+                    val_outputs_list.append(outputs.cpu().numpy())
             
             val_outputs = np.vstack(val_outputs_list)
             val_pred = (val_outputs > 0.5).astype(int).flatten()
             
             val_accuracy = accuracy_score(y_test, val_pred)
             val_auc = roc_auc_score(y_test, val_outputs.flatten())
+            val_f1 = f1_score(y_test, val_pred)
                 
-            avg_loss = total_loss / len(train_loader)
-            scheduler.step(avg_loss)
+            avg_train_loss = total_loss / len(train_loader)
+            avg_val_loss = val_loss / len(test_loader)
+            train_losses.append(avg_train_loss)
+            val_losses.append(avg_val_loss)
             
-            # Early stopping
-            if val_auc > best_auc:
+            scheduler.step(avg_val_loss)
+            
+            # Early stopping based on validation loss and AUC
+            if val_auc > best_auc and avg_val_loss < best_loss * 1.1:  # Allow 10% tolerance
                 best_auc = val_auc
+                best_loss = avg_val_loss
                 patience_counter = 0
                 # Save best model
                 torch.save(model.state_dict(), os.path.join(MODELS_DIR, 'lstm_best.pth'))
             else:
                 patience_counter += 1
             
-            if (epoch + 1) % 5 == 0:
-                logger.info(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}, Val Acc: {val_accuracy:.4f}, Val AUC: {val_auc:.4f}")
+            if (epoch + 1) % 3 == 0:
+                logger.info(f"Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}, Val Acc: {val_accuracy:.4f}, Val F1: {val_f1:.4f}, Val AUC: {val_auc:.4f}")
             
-            if patience_counter >= 7:
+            if patience_counter >= 10:
                 logger.info(f"Early stopping at epoch {epoch+1}")
                 break
         

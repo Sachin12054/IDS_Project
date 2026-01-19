@@ -32,25 +32,40 @@ logger = logging.getLogger(__name__)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class LSTMClassifier(nn.Module):
-    """LSTM model for time series classification"""
-    def __init__(self, input_size, hidden_size=64, num_layers=1, dropout=0.1):
+    """LSTM model for time series classification with improved architecture"""
+    def __init__(self, input_size, hidden_size=96, num_layers=2, dropout=0.3):
         super(LSTMClassifier, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         
+        # Bidirectional LSTM for capturing patterns in both directions
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, 
-                           batch_first=True, dropout=dropout, bidirectional=True)
+                           batch_first=True, dropout=dropout if num_layers > 1 else 0, 
+                           bidirectional=True)
+        
+        # Fully connected layers with batch normalization
+        self.batch_norm = nn.BatchNorm1d(hidden_size * 2)
         self.fc1 = nn.Linear(hidden_size * 2, 64)
-        self.dropout = nn.Dropout(dropout)
-        self.fc2 = nn.Linear(64, 1)
+        self.dropout1 = nn.Dropout(dropout)
+        self.fc2 = nn.Linear(64, 32)
+        self.dropout2 = nn.Dropout(dropout * 0.7)
+        self.fc3 = nn.Linear(32, 1)
         self.sigmoid = nn.Sigmoid()
         
     def forward(self, x):
+        # LSTM layer
         lstm_out, _ = self.lstm(x)
-        out = lstm_out[:, -1, :]
+        out = lstm_out[:, -1, :]  # Take last time step
+        
+        # Batch normalization
+        out = self.batch_norm(out)
+        
+        # Fully connected layers with dropout
         out = torch.relu(self.fc1(out))
-        out = self.dropout(out)
-        out = self.sigmoid(self.fc2(out))
+        out = self.dropout1(out)
+        out = torch.relu(self.fc2(out))
+        out = self.dropout2(out)
+        out = self.sigmoid(self.fc3(out))
         return out
 
 class ModelEvaluator:

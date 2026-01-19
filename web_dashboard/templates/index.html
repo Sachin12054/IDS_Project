@@ -659,30 +659,6 @@
                     <i class="fas fa-sync-alt"></i> Refresh
                 </button>
             </div>
-            
-            <!-- Time Series Stats -->
-            <div class="stats-grid" style="margin-bottom: 20px;">
-                <div class="stat-card blue">
-                    <div class="stat-icon"><i class="fas fa-chart-bar"></i></div>
-                    <div class="stat-value" style="font-size: 18px;">STATIONARY</div>
-                    <div class="stat-label">ADF Test (p=0.0001)</div>
-                </div>
-                <div class="stat-card green">
-                    <div class="stat-icon"><i class="fas fa-wave-square"></i></div>
-                    <div class="stat-value" style="font-size: 18px;">SARIMA</div>
-                    <div class="stat-label">Best Model (AIC=6273)</div>
-                </div>
-                <div class="stat-card yellow">
-                    <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
-                    <div class="stat-value" style="font-size: 18px;">GARCH(1,1)</div>
-                    <div class="stat-label">ARCH Effects Detected</div>
-                </div>
-                <div class="stat-card red">
-                    <div class="stat-icon"><i class="fas fa-random"></i></div>
-                    <div class="stat-value" style="font-size: 18px;">Non-Linear</div>
-                    <div class="stat-label">McLeod-Li Test</div>
-                </div>
-            </div>
 
             <!-- Tab Buttons -->
             <div style="display: flex; gap: 10px; margin-bottom: 20px;">
@@ -721,15 +697,6 @@
                         <span style="background: var(--warning); padding: 4px 10px; border-radius: 12px; font-size: 11px;">Window=5</span>
                     </div>
                     <canvas id="rollingChart" height="150"></canvas>
-                </div>
-                
-                <!-- Forecast Chart -->
-                <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h4><i class="fas fa-crystal-ball" style="color: var(--danger);"></i> Forecast - Unit 2</h4>
-                        <span style="background: var(--danger); padding: 4px 10px; border-radius: 12px; font-size: 11px;">Prediction</span>
-                    </div>
-                    <canvas id="forecastChart" height="150"></canvas>
                 </div>
             </div>
 
@@ -856,7 +823,7 @@
     <script>
         // Charts
         let trafficChart, attackChart;
-        let attackTsChart, acfChart, rollingChart, forecastChart;
+        let attackTsChart, acfChart, rollingChart;
         let modelComparisonChart, featureImportanceChart, sarimaForecastChart, lstmForecastChart;
 
         // Initialize
@@ -975,30 +942,6 @@
                 },
                 options: chartOptions
             });
-
-            // Forecast Chart
-            forecastChart = new Chart(document.getElementById('forecastChart').getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Historical',
-                        data: [],
-                        borderColor: '#6366f1',
-                        backgroundColor: 'transparent',
-                        borderWidth: 2
-                    }, {
-                        label: 'Forecast',
-                        data: [],
-                        borderColor: '#ef4444',
-                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
-                        fill: true,
-                        borderWidth: 2,
-                        borderDash: [5, 5]
-                    }]
-                },
-                options: chartOptions
-            });
         }
 
         // Initialize Model Comparison Charts
@@ -1040,10 +983,10 @@
             featureImportanceChart = new Chart(document.getElementById('featureImportanceChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: ['rolling_mean_6', 'lag_1', 'lag_2', 'lag_17', 'rolling_mean_24'],
+                    labels: [],
                     datasets: [{
                         label: 'Importance',
-                        data: [0.36, 0.34, 0.08, 0.05, 0.03],
+                        data: [],
                         backgroundColor: 'rgba(16,185,129,0.7)',
                         borderColor: '#10b981',
                         borderWidth: 1
@@ -1054,6 +997,18 @@
                     indexAxis: 'y',
                     plugins: {
                         legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 1.0,
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        },
+                        y: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        }
                     }
                 }
             });
@@ -1109,6 +1064,15 @@
 
         // Load Model Comparison Data
         async function loadModelComparisonData() {
+            // Load Feature Importance
+            try {
+                const featureRes = await fetch('/api/models/feature_importance');
+                const featureData = await featureRes.json();
+                featureImportanceChart.data.labels = featureData.features;
+                featureImportanceChart.data.datasets[0].data = featureData.importance;
+                featureImportanceChart.update();
+            } catch (e) { console.error('Error loading feature importance:', e); }
+            
             // Load SARIMA Forecast
             try {
                 const sarimaRes = await fetch('/api/models/sarima_forecast');
@@ -1158,20 +1122,6 @@
                 rollingChart.data.datasets[1].data = rollData.rolling_mean;
                 rollingChart.update();
             } catch (e) { console.error('Error loading rolling stats:', e); }
-
-            // Load Forecast
-            try {
-                const foreResponse = await fetch('/api/realtime/forecast');
-                const foreData = await foreResponse.json();
-                const allLabels = [...foreData.historical.labels, ...foreData.forecast.labels];
-                const historicalData = [...foreData.historical.data, ...Array(foreData.forecast.data.length).fill(null)];
-                const forecastData = [...Array(foreData.historical.data.length).fill(null), ...foreData.forecast.data];
-                
-                forecastChart.data.labels = allLabels;
-                forecastChart.data.datasets[0].data = historicalData;
-                forecastChart.data.datasets[1].data = forecastData;
-                forecastChart.update();
-            } catch (e) { console.error('Error loading forecast:', e); }
         }
 
         function initCharts() {
@@ -1430,38 +1380,35 @@
                     return;
                 }
                 
-                // Define descriptions for each image
+                // Define descriptions for each image (Unit 1 only)
                 const descriptions = {
                     'attack_count_acf_pacf': {
                         title: 'ACF & PACF Analysis',
                         unit: 'Unit 1',
                         desc: 'Autocorrelation and Partial Autocorrelation Functions'
-                    },
-                    'attack_count_decomposition': {
-                        title: 'Seasonal Decomposition',
-                        unit: 'Unit 3',
-                        desc: 'Trend + Seasonal + Residual Components'
-                    },
-                    'attack_count_sarima': {
-                        title: 'SARIMA Forecast',
-                        unit: 'Unit 2',
-                        desc: 'Seasonal ARIMA Model Predictions'
-                    },
-                    'traffic_volume_garch': {
-                        title: 'GARCH Volatility',
-                        unit: 'Unit 2',
-                        desc: 'Conditional Heteroscedasticity Analysis'
-                    },
-                    'attack_forecast_comparison': {
-                        title: 'Forecast Comparison',
-                        unit: 'Unit 4',
-                        desc: 'SMA vs Exponential Smoothing vs ARIMA'
                     }
                 };
                 
-                gallery.innerHTML = images.map(img => {
+                // Filter to show only Unit 1 content
+                const unit1Images = images.filter(img => {
                     const key = img.filename.replace('.png', '');
-                    const info = descriptions[key] || { title: img.name, unit: 'Analysis', desc: '' };
+                    const info = descriptions[key];
+                    return info && info.unit === 'Unit 1';
+                });
+                
+                if (unit1Images.length === 0) {
+                    gallery.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: var(--text-muted); grid-column: 1 / -1;">
+                            <i class="fas fa-chart-line fa-3x" style="opacity: 0.3;"></i>
+                            <p style="margin-top: 20px;">No Unit 1 time series plots available</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                gallery.innerHTML = unit1Images.map(img => {
+                    const key = img.filename.replace('.png', '');
+                    const info = descriptions[key];
                     return `
                         <div style="background: rgba(0,0,0,0.2); border-radius: 12px; overflow: hidden;">
                             <div style="padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1);">
