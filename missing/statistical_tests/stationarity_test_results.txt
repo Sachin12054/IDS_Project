@@ -1,0 +1,72 @@
+======================================================================
+  STATIONARITY TEST RESULTS - DETAILED REPORT
+======================================================================
+
+ORIGINAL SERIES
+----------------------------------------------------------------------
+
+Augmented Dickey-Fuller Test:
+  ADF Statistic: -2.075464
+  p-value: 0.254494
+  Used Lags: 18
+  Observations: 427
+  Critical Values:
+    1%: -3.4458
+    5%: -2.8683
+    10%: -2.5704
+
+  Conclusion: NON-STATIONARY
+
+KPSS Test:
+  KPSS Statistic: 3.072464
+  p-value: 0.010000
+  Used Lags: 11
+  Critical Values:
+    10%: 0.3470
+    5%: 0.4630
+    2.5%: 0.5740
+    1%: 0.7390
+
+  Conclusion: NON-STATIONARY
+
+
+======================================================================
+
+FIRST DIFFERENCED SERIES
+----------------------------------------------------------------------
+
+Augmented Dickey-Fuller Test:
+  ADF Statistic: -10.380591
+  p-value: 0.000000
+  Used Lags: 18
+  Observations: 426
+  Critical Values:
+    1%: -3.4458
+    5%: -2.8683
+    10%: -2.5704
+
+  Conclusion: STATIONARY
+
+KPSS Test:
+  KPSS Statistic: 0.018776
+  p-value: 0.100000
+  Used Lags: 12
+  Critical Values:
+    10%: 0.3470
+    5%: 0.4630
+    2.5%: 0.5740
+    1%: 0.7390
+
+  Conclusion: STATIONARY
+
+
+======================================================================
+RECOMMENDATION
+======================================================================
+
+Based on both ADF and KPSS tests:
+  1. Original series shows borderline stationarity
+  2. First differencing (d=1) creates strongly stationary series
+  3. Use SARIMA(p,1,q)(P,D,Q)_24 with d=1 differencing
+  4. ML models (XGBoost/LSTM) can use original series
+

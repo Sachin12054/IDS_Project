@@ -1,0 +1,5 @@
+GRANGER CAUSALITY TEST RESULTS
+==================================================
+
+total_packets -> attack_count: ERROR
+attack_count -> attack_rate: NO

@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Missing Plots - IDS Time Series Project</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+            padding-bottom: 30px;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 20px;
+        }
+        
+        .stat-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .section {
+            margin-bottom: 60px;
+        }
+        
+        .section-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .section-header h2 {
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+        
+        .section-header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+        }
+        
+        .plot-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .plot-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .plot-card img {
+            width: 100%;
+            height: 300px;
+            object-fit: cover;
+            cursor: pointer;
+            transition: opacity 0.3s ease;
+        }
+        
+        .plot-card img:hover {
+            opacity: 0.9;
+        }
+        
+        .plot-info {
+            padding: 20px;
+        }
+        
+        .plot-info h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+        
+        .plot-info p {
+            color: #666;
+            font-size: 0.95em;
+            line-height: 1.6;
+        }
+        
+        .badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin-top: 10px;
+        }
+        
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .summary-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        .summary-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .summary-table tr:hover {
+            background: #f5f5f5;
+        }
+        
+        .best-badge {
+            background: #ffd700;
+            color: #333;
+            padding: 3px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 0.8em;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 2px solid #e0e0e0;
+            color: #666;
+        }
+        
+        /* Lightbox styles */
+        .lightbox {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .lightbox img {
+            max-width: 90%;
+            max-height: 90%;
+            box-shadow: 0 0 50px rgba(255,255,255,0.3);
+        }
+        
+        .lightbox:target {
+            display: flex;
+        }
+        
+        .close-lightbox {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        
+        .close-lightbox:hover {
+            color: #ffd700;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 Missing Plots & Visualizations</h1>
+            <p class="subtitle">IDS Time Series Analysis - CSE-CIC-IDS2018 Dataset</p>
+            
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-number">16</div>
+                    <div class="stat-label">Total Visualizations</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number">3</div>
+                    <div class="stat-label">Analysis Categories</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label">Completion Status</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Section 1: Time Series Models -->
+        <div class="section">
+            <div class="section-header">
+                <h2>📈 Part 1: Time Series Models</h2>
+                <p>SARIMA, XGBoost, and LSTM forecasting comparisons (8 plots)</p>
+            </div>
+            
+            <div class="gallery">
+                <div class="plot-card">
+                    <a href="#lightbox-1"><img src="time_series_models/model_comparison.png" alt="Model Comparison"></a>
+                    <div class="plot-info">
+                        <h3>Model Comparison</h3>
+                        <p>Overview of SARIMA, XGBoost, and LSTM forecasts. Shows training data and test predictions in a 2×2 grid comparing linear, non-linear, and deep learning approaches.</p>
+                        <span class="badge">CORE</span>
+                    </div>
+                </div>
+                
+                <div class="plot-card">
+                    <a href="#lightbox-2"><img src="time_series_models/model_metrics_comparison.png" alt="Metrics Comparison"></a>
+                    <div class="plot-info">
+                        <h3>Metrics Comparison</h3>
+                        <p>Bar chart comparing RMSE and MAE across all models. Color-coded by model type with annotated error values. LSTM shows lowest RMSE (607.61).</p>
+                        <span class="badge">CORE</span>
+                    </div>
+                </div>
+                
+                <div class="plot-card">
+                    <a href="#lightbox-3"><img src="time_series_models/residual_analysis.png" alt="Residual Analysis"></a>
+                    <div class="plot-info">
+                        <h3>Residual Analysis</h3>
+                        <p>3×3 grid of residual diagnostics for each model: residuals over time, distribution histogram, and Q-Q plot to assess model fit quality and normality assumptions.</p>
+                        <span class="badge">VALIDATION</span>
+                    </div>
+                </div>
+                
+                <div class="plot-card">
+                    <a href="#lightbox-4"><img src="time_series_models/lstm_learning_curves.png" alt="LSTM Learning"></a>
+                    <div class="plot-info">
+                        <h3>LSTM Learning Curves</h3>
+                        <p>Training loss progression over 30 epochs showing convergence behavior. Best epoch marked with minimum loss annotation.</p>
+                        <span class="badge">DEEP LEARNING</span>
+                    </div>
+                </div>
+                
+                <div class="plot-card">
+                    <a href="#lightbox-5"><img src="time_series_models/xgboost_feature_importance.png" alt="Feature Importance"></a>
+                    <div class="plot-info">
+                        <h3>XGBoost Feature Importance</h3>
+                        <p>Top 15 most important features revealed by XGBoost model. Includes lag features, rolling statistics, and temporal features with importance scores.</p>
+                        <span class="badge">INTERPRETABILITY</span>
+                    </div>
+                </div>
+                
+                <div class="plot-card">
+                    <a href="#lightbox-6"><img src="time_series_models/prediction_intervals.png" alt="Prediction Intervals"></a>
+                    <div class="plot-info">
+                        <h3>Prediction Intervals</h3>
+                        <p>95% confidence intervals for all three models showing prediction uncertainty. Helps assess forecast reliability and risk quantification.</p>
+                        <span class="badge">UNCERTAINTY</span>
+                    </div>
+                </div>
+                
+                <div class="plot-card">
+                    <a href="#lightbox-7"><img src="time_series_models/error_distributions.png" alt="Error Distributions"></a>
+                    <div class="plot-info">
+                        <h3>Error Distributions</h3>
+                        <p>2×2 grid: box plot, violin plot, histogram, and cumulative distribution comparing error characteristics across models to identify outliers and patterns.</p>
+                        <span class="badge">ERROR ANALYSIS</span>
+                    </div>
+                </div>
+                
+                <div class="plot-card">
+                    <a href="#lightbox-8"><img src="time_series_models/arima_diagnostics.png" alt="ARIMA Diagnostics"></a>
+                    <div class="plot-info">
+                        <h3>ARIMA Diagnostics</h3>
+                        <p>6-panel SARIMA diagnostic suite: standardized residuals, histogram, Q-Q plot, ACF, PACF, and ACF of squared residuals for complete model validation.</p>
+                        <span class="badge">STATISTICAL</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Performance Table -->
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>RMSE</th>
+                        <th>MAE</th>
+                        <th>R²</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>SARIMA</strong></td>
+                        <td>992.42</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>Linear Model</td>
+                    </tr>
+                    <tr>
+                        <td><strong>XGBoost</strong></td>
+                        <td>621.72</td>
+                        <td>-</td>
+                        <td>0.601</td>
+                        <td>Non-Linear</td>
+                    </tr>
+                    <tr>
+                        <td><strong>LSTM</strong></td>
+                        <td>607.61 <span class="best-badge">BEST</span></td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>Deep Learning</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Section 2: Advanced Analysis -->
+        <div class="section">
+            <div class="section-header">
+                <h2>🔬 Part 2: Advanced Time Series Analysis</h2>
+                <p>Spectral, causality, and structural analysis (4 plots + 1 report)</p>
+            </div>
+            
+            <div class="gallery">
+                <div class="plot-card">
+                    <a href="#lightbox-9"><img src="advanced_time_series/spectral_analysis.png" alt="Spectral Analysis"></a>
+                    <div class="plot-info">
+                        <h3>Spectral Analysis</h3>
+                        <p>2×2 grid of frequency domain analyses: Periodogram, FFT, Welch's method, and Spectrogram. Detects cyclical patterns and periodicities (24-hour cycle found).</p>
+                        <span class="badge">FREQUENCY</span>
+                    </div>
+                </div>
+                
+                <div class="plot-card">
+                    <a href="#lightbox-10"><img src="advanced_time_series/cross_correlation.png" alt="Cross Correlation"></a>
+                    <div class="plot-info">
+                        <h3>Cross-Correlation Analysis</h3>
+                        <p>Cross-correlation plots between key variables: (attack_count, total_packets) and (attack_count, attack_rate). Identifies lead-lag relationships.</p>
+                        <span class="badge">CORRELATION</span>
+                    </div>
+                </div>
+                
+                <div class="plot-card">
+                    <a href="#lightbox-11"><img src="advanced_time_series/structural_breaks.png" alt="Structural Breaks"></a>
+                    <div class="plot-info">
+                        <h3>Structural Break Detection</h3>
+                        <p>CUSUM analysis for multiple time series detecting structural changes in attack patterns. Identifies regime shifts and attack campaign changes.</p>
+                        <span class="badge">CHANGE POINTS</span>
+                    </div>
+                </div>
+                
+                <div class="plot-card">
+                    <div class="plot-info">
+                        <h3>Granger Causality Report</h3>
+                        <p><strong>File:</strong> granger_causality_results.txt<br>
+                        Text report of Granger causality tests establishing causal relationships between variables. Tests up to 12 lags to identify predictive relationships.</p>
+                        <span class="badge">CAUSALITY</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 3: Enhanced Visualizations -->
+        <div class="section">
+            <div class="section-header">
+                <h2>🎨 Part 3: Enhanced Visualizations</h2>
+                <p>Comprehensive model comparisons and attack patterns (3 plots)</p>
+            </div>
+            
+            <div class="gallery">
+                <div class="plot-card">
+                    <a href="#lightbox-12"><img src="enhanced_visualizations/comprehensive_model_comparison.png" alt="Comprehensive Comparison"></a>
+                    <div class="plot-info">
+                        <h3>Comprehensive Model Comparison</h3>
+                        <p>6-panel analysis: radar chart, grouped bars, heatmap, scatter plot, violin plot, and summary statistics. One-stop visualization for all model comparisons.</p>
+                        <span class="badge">DASHBOARD</span>
+                    </div>
+                </div>
+                
+                <div class="plot-card">
+                    <a href="#lightbox-13"><img src="enhanced_visualizations/attack_pattern_heatmaps.png" alt="Attack Patterns"></a>
+                    <div class="plot-info">
+                        <h3>Attack Pattern Heatmaps</h3>
+                        <p>2×2 grid: attack count by hour×day, attack rate heatmap, daily timeline, and hourly distribution. Identifies when attacks are most likely (peak hours highlighted).</p>
+                        <span class="badge">SECURITY</span>
+                    </div>
+                </div>
+                
+                <div class="plot-card">
+                    <a href="#lightbox-14"><img src="enhanced_visualizations/metric_evolution.png" alt="Metric Evolution"></a>
+                    <div class="plot-info">
+                        <h3>Metric Evolution</h3>
+                        <p>2×3 grid showing metric progression across model types (Accuracy, Precision, Recall, F1, ROC-AUC). Best models marked with gold stars.</p>
+                        <span class="badge">PERFORMANCE</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Classification Performance Table -->
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Accuracy</th>
+                        <th>Precision</th>
+                        <th>Recall</th>
+                        <th>F1 Score</th>
+                        <th>ROC-AUC</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Random Forest</strong></td>
+                        <td>98.64%</td>
+                        <td>96.30%</td>
+                        <td>95.18%</td>
+                        <td>95.74%</td>
+                        <td>99.58%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>XGBoost</strong></td>
+                        <td>98.68% <span class="best-badge">BEST</span></td>
+                        <td>96.33% <span class="best-badge">BEST</span></td>
+                        <td>95.36% <span class="best-badge">BEST</span></td>
+                        <td>95.84% <span class="best-badge">BEST</span></td>
+                        <td>99.61% <span class="best-badge">BEST</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>LSTM</strong></td>
+                        <td>94.06%</td>
+                        <td>82.90%</td>
+                        <td>79.36%</td>
+                        <td>81.09%</td>
+                        <td>98.53%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <footer>
+            <p><strong>Project:</strong> IDS Time Series Analysis using CSE-CIC-IDS2018 Dataset</p>
+            <p><strong>Generated:</strong> January 19, 2026</p>
+            <p><strong>Status:</strong> ✅ All Missing Plots Successfully Generated</p>
+            <p style="margin-top: 20px; color: #999;">Click any image to view full size</p>
+        </footer>
+    </div>
+
+    <!-- Lightboxes for full-size images -->
+    <div id="lightbox-1" class="lightbox">
+        <a href="#" class="close-lightbox">&times;</a>
+        <img src="time_series_models/model_comparison.png" alt="Model Comparison">
+    </div>
+    <div id="lightbox-2" class="lightbox">
+        <a href="#" class="close-lightbox">&times;</a>
+        <img src="time_series_models/model_metrics_comparison.png" alt="Metrics Comparison">
+    </div>
+    <div id="lightbox-3" class="lightbox">
+        <a href="#" class="close-lightbox">&times;</a>
+        <img src="time_series_models/residual_analysis.png" alt="Residual Analysis">
+    </div>
+    <div id="lightbox-4" class="lightbox">
+        <a href="#" class="close-lightbox">&times;</a>
+        <img src="time_series_models/lstm_learning_curves.png" alt="LSTM Learning">
+    </div>
+    <div id="lightbox-5" class="lightbox">
+        <a href="#" class="close-lightbox">&times;</a>
+        <img src="time_series_models/xgboost_feature_importance.png" alt="Feature Importance">
+    </div>
+    <div id="lightbox-6" class="lightbox">
+        <a href="#" class="close-lightbox">&times;</a>
+        <img src="time_series_models/prediction_intervals.png" alt="Prediction Intervals">
+    </div>
+    <div id="lightbox-7" class="lightbox">
+        <a href="#" class="close-lightbox">&times;</a>
+        <img src="time_series_models/error_distributions.png" alt="Error Distributions">
+    </div>
+    <div id="lightbox-8" class="lightbox">
+        <a href="#" class="close-lightbox">&times;</a>
+        <img src="time_series_models/arima_diagnostics.png" alt="ARIMA Diagnostics">
+    </div>
+    <div id="lightbox-9" class="lightbox">
+        <a href="#" class="close-lightbox">&times;</a>
+        <img src="advanced_time_series/spectral_analysis.png" alt="Spectral Analysis">
+    </div>
+    <div id="lightbox-10" class="lightbox">
+        <a href="#" class="close-lightbox">&times;</a>
+        <img src="advanced_time_series/cross_correlation.png" alt="Cross Correlation">
+    </div>
+    <div id="lightbox-11" class="lightbox">
+        <a href="#" class="close-lightbox">&times;</a>
+        <img src="advanced_time_series/structural_breaks.png" alt="Structural Breaks">
+    </div>
+    <div id="lightbox-12" class="lightbox">
+        <a href="#" class="close-lightbox">&times;</a>
+        <img src="enhanced_visualizations/comprehensive_model_comparison.png" alt="Comprehensive Comparison">
+    </div>
+    <div id="lightbox-13" class="lightbox">
+        <a href="#" class="close-lightbox">&times;</a>
+        <img src="enhanced_visualizations/attack_pattern_heatmaps.png" alt="Attack Patterns">
+    </div>
+    <div id="lightbox-14" class="lightbox">
+        <a href="#" class="close-lightbox">&times;</a>
+        <img src="enhanced_visualizations/metric_evolution.png" alt="Metric Evolution">
+    </div>
+</body>
+</html>

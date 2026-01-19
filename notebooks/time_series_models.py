@@ -35,6 +35,7 @@ import xgboost as xgb
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
+from scipy import stats
 
 # Add project root
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -57,6 +58,11 @@ class TimeSeriesIDS:
         self.results = {}
         self.attack_series = None
         self.scaler = MinMaxScaler()
+        self.sarima_model_fit = None
+        self.xgboost_model = None
+        self.lstm_model = None
+        self.lstm_train_losses = []
+        self.xgb_feature_importance = None
         
     def load_and_prepare_data(self):
         """Load data and create hourly attack time series"""
@@ -145,8 +151,11 @@ class TimeSeriesIDS:
                 'aic': model_fit.aic,
                 'rmse': rmse,
                 'mae': mae,
-                'forecast': forecast
+                'forecast': forecast,
+                'residuals': model_fit.resid
             }
+            
+            self.sarima_model_fit = model_fit
             
             return model_fit, forecast
             
@@ -243,6 +252,8 @@ class TimeSeriesIDS:
             for _, row in importance.head(5).iterrows():
                 print(f"   - {row['feature']}: {row['importance']:.4f}")
             
+            self.xgb_feature_importance = importance
+            
             self.results['XGBoost'] = {
                 'model': 'XGBoost Regressor',
                 'type': 'NON-LINEAR',
@@ -250,8 +261,11 @@ class TimeSeriesIDS:
                 'mae': mae,
                 'r2': r2,
                 'forecast': forecast,
-                'y_test': y_test.values
+                'y_test': y_test.values,
+                'residuals': y_test.values - forecast
             }
+            
+            self.xgboost_model = model
             
             return model, forecast, y_test
             
@@ -332,8 +346,11 @@ class TimeSeriesIDS:
                     optimizer.step()
                     total_loss += loss.item()
                 
+                avg_loss = total_loss/len(train_loader)
+                self.lstm_train_losses.append(avg_loss)
+                
                 if (epoch + 1) % 10 == 0:
-                    print(f"   Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(train_loader):.6f}")
+                    print(f"   Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.6f}")
             
             # Predict
             model.eval()
@@ -359,8 +376,11 @@ class TimeSeriesIDS:
                 'rmse': rmse,
                 'mae': mae,
                 'forecast': forecast,
-                'y_test': y_test_actual
+                'y_test': y_test_actual,
+                'residuals': y_test_actual - forecast
             }
+            
+            self.lstm_model = model
             
             return model, forecast, y_test_actual
             
@@ -369,6 +389,307 @@ class TimeSeriesIDS:
             import traceback
             traceback.print_exc()
             return None, None, None
+    
+    # =========================================================================
+    # ADDITIONAL VISUALIZATION METHODS
+    # =========================================================================
+    
+    def plot_residual_analysis(self):
+        """Comprehensive residual analysis for all models"""
+        print("\n" + "=" * 70)
+        print("GENERATING RESIDUAL ANALYSIS PLOTS")
+        print("=" * 70)
+        
+        fig, axes = plt.subplots(3, 3, figsize=(18, 15))
+        
+        models = ['SARIMA', 'XGBoost', 'LSTM']
+        
+        for i, model_name in enumerate(models):
+            if model_name in self.results and 'residuals' in self.results[model_name]:
+                residuals = self.results[model_name]['residuals']
+                
+                # 1. Residual plot
+                ax1 = axes[i, 0]
+                ax1.plot(residuals, alpha=0.7)
+                ax1.axhline(y=0, color='r', linestyle='--', linewidth=2)
+                ax1.set_title(f'{model_name} - Residuals Over Time', fontweight='bold')
+                ax1.set_ylabel('Residuals')
+                ax1.grid(True, alpha=0.3)
+                
+                # 2. Histogram of residuals
+                ax2 = axes[i, 1]
+                ax2.hist(residuals, bins=50, edgecolor='black', alpha=0.7)
+                ax2.axvline(x=0, color='r', linestyle='--', linewidth=2)
+                ax2.set_title(f'{model_name} - Residual Distribution', fontweight='bold')
+                ax2.set_xlabel('Residuals')
+                ax2.set_ylabel('Frequency')
+                
+                # Add statistics
+                mean_res = np.mean(residuals)
+                std_res = np.std(residuals)
+                ax2.text(0.98, 0.98, f'Mean: {mean_res:.2f}\nStd: {std_res:.2f}',
+                        transform=ax2.transAxes, verticalalignment='top',
+                        horizontalalignment='right', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+                
+                # 3. Q-Q Plot
+                ax3 = axes[i, 2]
+                from scipy import stats
+                stats.probplot(residuals, dist="norm", plot=ax3)
+                ax3.set_title(f'{model_name} - Q-Q Plot', fontweight='bold')
+                ax3.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(OUTPUT_DIR, 'residual_analysis.png'), dpi=150, bbox_inches='tight')
+        plt.close()
+        print(f"✅ Residual analysis saved")
+    
+    def plot_lstm_learning_curves(self):
+        """Plot LSTM training loss over epochs"""
+        if not self.lstm_train_losses:
+            print("⚠️ No LSTM training history available")
+            return
+        
+        print("\n" + "=" * 70)
+        print("GENERATING LSTM LEARNING CURVES")
+        print("=" * 70)
+        
+        fig, ax = plt.subplots(figsize=(12, 6))
+        
+        epochs = range(1, len(self.lstm_train_losses) + 1)
+        ax.plot(epochs, self.lstm_train_losses, linewidth=2, color='purple', marker='o', markersize=4)
+        ax.set_title('LSTM Training Loss Over Epochs', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Epoch', fontsize=12)
+        ax.set_ylabel('MSE Loss', fontsize=12)
+        ax.grid(True, alpha=0.3)
+        
+        # Add best loss annotation
+        min_loss_idx = np.argmin(self.lstm_train_losses)
+        min_loss = self.lstm_train_losses[min_loss_idx]
+        ax.annotate(f'Best Loss: {min_loss:.6f}\nEpoch: {min_loss_idx+1}',
+                   xy=(min_loss_idx+1, min_loss),
+                   xytext=(min_loss_idx+1+5, min_loss+0.001),
+                   arrowprops=dict(arrowstyle='->', color='red', lw=2),
+                   fontsize=11, bbox=dict(boxstyle='round', facecolor='yellow', alpha=0.7))
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(OUTPUT_DIR, 'lstm_learning_curves.png'), dpi=150, bbox_inches='tight')
+        plt.close()
+        print(f"✅ LSTM learning curves saved")
+    
+    def plot_feature_importance(self):
+        """Plot XGBoost feature importance"""
+        if self.xgb_feature_importance is None:
+            print("⚠️ No feature importance data available")
+            return
+        
+        print("\n" + "=" * 70)
+        print("GENERATING FEATURE IMPORTANCE PLOT")
+        print("=" * 70)
+        
+        fig, ax = plt.subplots(figsize=(12, 8))
+        
+        top_features = self.xgb_feature_importance.head(15)
+        
+        bars = ax.barh(range(len(top_features)), top_features['importance'].values, color='teal', alpha=0.8)
+        ax.set_yticks(range(len(top_features)))
+        ax.set_yticklabels(top_features['feature'].values)
+        ax.invert_yaxis()
+        ax.set_xlabel('Importance Score', fontsize=12)
+        ax.set_title('XGBoost - Top 15 Feature Importances', fontsize=14, fontweight='bold')
+        ax.grid(True, axis='x', alpha=0.3)
+        
+        # Add value labels
+        for i, (bar, val) in enumerate(zip(bars, top_features['importance'].values)):
+            ax.text(val, bar.get_y() + bar.get_height()/2, f'{val:.4f}',
+                   ha='left', va='center', fontsize=9, fontweight='bold')
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(OUTPUT_DIR, 'xgboost_feature_importance.png'), dpi=150, bbox_inches='tight')
+        plt.close()
+        print(f"✅ Feature importance plot saved")
+    
+    def plot_prediction_intervals(self, train, test):
+        """Plot predictions with confidence intervals"""
+        print("\n" + "=" * 70)
+        print("GENERATING PREDICTION INTERVALS")
+        print("=" * 70)
+        
+        fig, axes = plt.subplots(1, 3, figsize=(20, 6))
+        
+        # Calculate prediction intervals (approximation using std)
+        for idx, model_name in enumerate(['SARIMA', 'XGBoost', 'LSTM']):
+            if model_name not in self.results:
+                continue
+            
+            ax = axes[idx]
+            
+            if model_name == 'SARIMA':
+                y_test = test.values
+                forecast = self.results[model_name]['forecast'].values
+                test_index = test.index
+            else:
+                y_test = self.results[model_name]['y_test']
+                forecast = self.results[model_name]['forecast']
+                test_index = range(len(y_test))
+            
+            # Calculate standard error
+            residuals = self.results[model_name].get('residuals', y_test - forecast)
+            std_error = np.std(residuals)
+            
+            # 95% confidence interval (approximation)
+            lower_bound = forecast - 1.96 * std_error
+            upper_bound = forecast + 1.96 * std_error
+            
+            # Plot
+            ax.plot(test_index, y_test, label='Actual', linewidth=2, color='blue', alpha=0.7)
+            ax.plot(test_index, forecast, label='Forecast', linewidth=2, color='red', linestyle='--')
+            ax.fill_between(test_index, lower_bound, upper_bound, alpha=0.2, color='red',
+                           label='95% Confidence Interval')
+            
+            ax.set_title(f'{model_name} - Prediction Intervals', fontsize=14, fontweight='bold')
+            ax.set_xlabel('Time' if model_name == 'SARIMA' else 'Index')
+            ax.set_ylabel('Attack Count')
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(OUTPUT_DIR, 'prediction_intervals.png'), dpi=150, bbox_inches='tight')
+        plt.close()
+        print(f"✅ Prediction intervals saved")
+    
+    def plot_error_distributions(self):
+        """Compare error distributions across all models"""
+        print("\n" + "=" * 70)
+        print("GENERATING ERROR DISTRIBUTION COMPARISON")
+        print("=" * 70)
+        
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        
+        # Collect all errors
+        all_errors = {}
+        for model_name in ['SARIMA', 'XGBoost', 'LSTM']:
+            if model_name in self.results and 'residuals' in self.results[model_name]:
+                all_errors[model_name] = self.results[model_name]['residuals']
+        
+        # 1. Box plot comparison
+        ax1 = axes[0, 0]
+        ax1.boxplot([all_errors[m] for m in all_errors.keys()],
+                   labels=list(all_errors.keys()),
+                   patch_artist=True,
+                   boxprops=dict(facecolor='lightblue', alpha=0.7))
+        ax1.axhline(y=0, color='r', linestyle='--', linewidth=2)
+        ax1.set_title('Error Distribution Comparison (Box Plot)', fontsize=14, fontweight='bold')
+        ax1.set_ylabel('Residuals')
+        ax1.grid(True, alpha=0.3)
+        
+        # 2. Violin plot
+        ax2 = axes[0, 1]
+        positions = range(1, len(all_errors) + 1)
+        parts = ax2.violinplot([all_errors[m] for m in all_errors.keys()],
+                              positions=positions,
+                              showmeans=True, showmedians=True)
+        ax2.axhline(y=0, color='r', linestyle='--', linewidth=2)
+        ax2.set_xticks(positions)
+        ax2.set_xticklabels(list(all_errors.keys()))
+        ax2.set_title('Error Distribution (Violin Plot)', fontsize=14, fontweight='bold')
+        ax2.set_ylabel('Residuals')
+        ax2.grid(True, alpha=0.3)
+        
+        # 3. Overlapping histograms
+        ax3 = axes[1, 0]
+        colors = ['red', 'green', 'purple']
+        for (model_name, errors), color in zip(all_errors.items(), colors):
+            ax3.hist(errors, bins=50, alpha=0.5, label=model_name, color=color, edgecolor='black')
+        ax3.axvline(x=0, color='black', linestyle='--', linewidth=2)
+        ax3.set_title('Overlapping Error Distributions', fontsize=14, fontweight='bold')
+        ax3.set_xlabel('Residuals')
+        ax3.set_ylabel('Frequency')
+        ax3.legend()
+        ax3.grid(True, alpha=0.3)
+        
+        # 4. Cumulative distribution
+        ax4 = axes[1, 1]
+        for (model_name, errors), color in zip(all_errors.items(), colors):
+            sorted_errors = np.sort(np.abs(errors))
+            cumulative = np.arange(1, len(sorted_errors) + 1) / len(sorted_errors)
+            ax4.plot(sorted_errors, cumulative, label=model_name, linewidth=2, color=color)
+        ax4.set_title('Cumulative Distribution of Absolute Errors', fontsize=14, fontweight='bold')
+        ax4.set_xlabel('Absolute Error')
+        ax4.set_ylabel('Cumulative Probability')
+        ax4.legend()
+        ax4.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(OUTPUT_DIR, 'error_distributions.png'), dpi=150, bbox_inches='tight')
+        plt.close()
+        print(f"✅ Error distributions saved")
+    
+    def plot_arima_diagnostics(self):
+        """ARIMA model diagnostic plots"""
+        if self.sarima_model_fit is None:
+            print("⚠️ No SARIMA model available for diagnostics")
+            return
+        
+        print("\n" + "=" * 70)
+        print("GENERATING ARIMA DIAGNOSTICS")
+        print("=" * 70)
+        
+        try:
+            fig = plt.figure(figsize=(16, 12))
+            
+            # Use statsmodels plot_diagnostics
+            from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+            
+            residuals = self.sarima_model_fit.resid
+            
+            # 1. Residuals over time
+            ax1 = plt.subplot(3, 2, 1)
+            ax1.plot(residuals)
+            ax1.axhline(y=0, color='r', linestyle='--')
+            ax1.set_title('Standardized Residuals', fontweight='bold')
+            ax1.grid(True, alpha=0.3)
+            
+            # 2. Histogram + KDE
+            ax2 = plt.subplot(3, 2, 2)
+            ax2.hist(residuals, bins=50, density=True, alpha=0.7, edgecolor='black')
+            
+            # Add normal distribution overlay
+            from scipy.stats import norm
+            mu, sigma = residuals.mean(), residuals.std()
+            x = np.linspace(residuals.min(), residuals.max(), 100)
+            ax2.plot(x, norm.pdf(x, mu, sigma), 'r-', linewidth=2, label='Normal')
+            ax2.set_title('Histogram + Estimated Density', fontweight='bold')
+            ax2.legend()
+            
+            # 3. Q-Q Plot
+            ax3 = plt.subplot(3, 2, 3)
+            from scipy import stats
+            stats.probplot(residuals, dist="norm", plot=ax3)
+            ax3.set_title('Normal Q-Q Plot', fontweight='bold')
+            ax3.grid(True, alpha=0.3)
+            
+            # 4. ACF of residuals
+            ax4 = plt.subplot(3, 2, 4)
+            plot_acf(residuals, lags=40, ax=ax4)
+            ax4.set_title('ACF of Residuals', fontweight='bold')
+            
+            # 5. PACF of residuals
+            ax5 = plt.subplot(3, 2, 5)
+            plot_pacf(residuals, lags=40, ax=ax5)
+            ax5.set_title('PACF of Residuals', fontweight='bold')
+            
+            # 6. Residuals squared (ARCH effects)
+            ax6 = plt.subplot(3, 2, 6)
+            plot_acf(residuals**2, lags=40, ax=ax6)
+            ax6.set_title('ACF of Squared Residuals (ARCH Test)', fontweight='bold')
+            
+            plt.tight_layout()
+            plt.savefig(os.path.join(OUTPUT_DIR, 'arima_diagnostics.png'), dpi=150, bbox_inches='tight')
+            plt.close()
+            print(f"✅ ARIMA diagnostics saved")
+            
+        except Exception as e:
+            print(f"⚠️ Error generating ARIMA diagnostics: {e}")
     
     # =========================================================================
     # VISUALIZATION & COMPARISON
@@ -570,8 +891,16 @@ def main():
     ts_ids.train_xgboost(train, test)
     ts_ids.train_lstm(train, test, epochs=30)
     
-    # Visualize
+    # Visualize - Original plots
     ts_ids.plot_results(train, test)
+    
+    # NEW: Additional comprehensive visualizations
+    ts_ids.plot_residual_analysis()
+    ts_ids.plot_lstm_learning_curves()
+    ts_ids.plot_feature_importance()
+    ts_ids.plot_prediction_intervals(train, test)
+    ts_ids.plot_error_distributions()
+    ts_ids.plot_arima_diagnostics()
     
     # Report
     results = ts_ids.generate_report()
